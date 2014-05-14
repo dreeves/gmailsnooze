@@ -1,0 +1,144 @@
+<div class="container" 
+style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; margin:40px;">
+
+  <h1>Snoozing is enabled for your Gmail account!</h1>
+
+  <p>
+  Last snooze-shift: <?= shsh1() ?>.
+  Snooze tallies as of <?= shdt() ?> are as follows:
+  </p>
+  <pre><?= tally() ?></pre>
+  <p>
+    (SNZ is the number of days snoozed,
+    THR is the number of threads that are snoozed for that many days, and
+    TOT is the cumulative total threads, 
+    namely the number of threads that will end up back in your 
+    inbox in the given number of days.
+    The first line gives the inbox size.)
+  </p>
+
+<!--
+  <p>And similarly for auto-expiring threads...</p>
+  <pre><?= tally('x') ?></pre>
+-->
+
+  <p>See <a href="http://messymatters.com/snooze">Messy Matters</a>
+    for how this works.
+    Or read on for a summary.
+                
+    (WARNING: If you happen to already use Gmail labels like "7" --
+    labels that are bare integers -- then
+    this app will change those labels on you.
+    You should probably either uninstall this app or change your labels.)
+  </p>
+  
+      
+  <h2>Snooze</h2>
+  <p>
+    All the magic is in the Gmail labels, using the standard Gmail interface. 
+    A thread with a single number as a label, say "7", will reappear in the 
+    inbox in 7 days. 
+    To snooze for 7 days (assuming you have keyboard shortcuts turned on in 
+    your Gmail settings) type: v7&lt;enter&gt;.
+    That moves the thread from the inbox to the label "7".
+  </p>
+  
+  <p>
+    Every night at midnight, everything will shift: threads labeled <i>i</i> 
+    will move to <i>i-1</i>, with new labels created as needed.
+    And anything with label "1" will reappear in the inbox, with no more 
+    integer label.
+  </p>  
+
+  <h2>Re-Ping</h2>
+  <p>
+    Re-Ping just refers to snoozing your own outgoing mail so it comes back to 
+    you and reminds you to follow up &mdash; re-ping the person &mdash; if you haven't 
+    gotten a response.
+    See <a href="http://messymatters.com/snooze">Messy Matters</a> for the how and
+    why.
+  </p>
+    
+  <p>
+    In short, you want your own sent mail to be easily snoozeable, which means 
+    creating a filter so your sent mail initially stays in your inbox:
+    <ol>
+      <li>Create a filter (available from the "show search options" dropdown on
+        the search box)</li>
+      <li>Set the From to your own email address, or your username -- something
+        that will match all the email addresses you send from</li>
+      <li>On the next screen, check nothing but "Never send it to Spam"</li>
+    </ol>
+  </p>
+
+<h2>Auto-Expire</h2>
+<p>UPDATE: I got rid of the auto-expire feature! If anyone actually liked it then I'll put it back.
+</p>
+<!--
+  <p>
+    Auto-Expire is like the inverse of Snooze.
+    A thread in your inbox with a label like "x90" will automatically archive
+    itself in 90 days.
+    To apply such a label 
+    (again, assuming keyboard shortcuts are enabled in your Gmail settings),
+    type lx90&lt;enter&gt;.
+    That applies the label "x90".
+  </p>
+  <p>
+    Similarly to Snooze, the number after the x will decrement nightly, until
+    the number disappears and the label is just "x" (indicating auto-expired),
+    when it will disappear from the inbox.
+  </p>
+-->
+
+<h2>Pro Tip</h2>
+<p>
+  If you end up with many dozens of different snooze labels,
+  the nightly shifting of labels may time out and some of your 
+  snoozed threads could end up late.
+  To prevent that, try to snooze things to labels that already exist so the
+  labels don't proliferate too much.
+</p>
+
+<h2>Crude Intra-Day Snoozing</h2>
+<p>
+Threads with label 0 are ignored by the midnight label shift but every
+day at noon, everything with label 0 is moved to the inbox.
+So snoozing to label 0 is a way to snooze for less than a day if it's before
+noon -- the thread comes back the same day at noon.
+And if it's after noon, snoozing to label 0 makes the thread come back at noon
+the following day.
+That might be handy if it's almost midnight and you want the thread to come at noon
+tomorrow instead of midnight tonight.
+</p>
+<p>
+In short: snooze for less than a day with v0&lt;enter&gt; if it's before noon 
+(comes back at noon) or v1&lt;enter&gt; if it's between noon and midnight 
+(comes back at midnight).
+</p>
+<p>
+You can also just use label 0 as a temporary holding area when organizing your inbox.
+</p>
+
+<!--
+  <h1>Bonus Feature</h1>
+  <p>
+    <b>SMS Alerts:</b> Set up a Gmail filter for important email to have the 
+    label "OMG" applied. 
+    Whenever a message gets the OMG label, this app will text it to you as a 
+    calendar reminder within a minute or so, and then remove the "OMG" label.
+  </p>
+-->
+
+<h1>Credits</h1>
+<p>
+  Written by <a href="http://dreev.es">Daniel Reeves</a>.
+  Special thanks to <a href="http://bethaknee.com">Bethany Soule</a>.
+</p>
+<p>
+  If you like Gmail Snooze, you may like 
+  <a href="http://beeminder.com">Beeminder</a>'s
+  <a href="http://beeminder.com/gmailzero">GmailZero</a>.
+</p>
+  <br/>
+</div>
