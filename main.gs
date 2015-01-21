@@ -21,6 +21,12 @@ function shdt() {
   return day+" "+hour+":"+min;
 }
 
+// Prettier version from Alice Monday
+//var pretty_date = function(){
+//  var d = new Date(), h = d.getHours(), m = d.getMinutes(), 
+//  a = ["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()],
+//  return a+" "+(h<10?"0":"")+h+":"+(m<10?"0":"")+m }
+
 // Show the last shiftstart time
 function shsh0() {
   var s = ScriptProperties.getProperty("shiftstart");
