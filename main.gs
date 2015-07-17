@@ -2,6 +2,9 @@
 // http://messymatters.com/snooze
 // ------------------------------------------------------------ (80 chars) ---->
 
+var BATCH = 500; // how many threads to fetch at a time
+var SNZL = "snz"; // label that snoozed threads get ("" for none)
+
 // Create a new trigger that calls a function daily at a given time (HH:MM)
 function trig(f, h, m) {
   ScriptApp.newTrigger(f).timeBased().atHour(h).nearMinute(m).everyDays(1)
@@ -12,20 +15,11 @@ function trig(f, h, m) {
 // Show the date and time
 function shdt() {
   var d = new Date();
-  var da = new Array("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT");
-  var day = da[d.getDay()];
-  var hour = d.getHours();
-  if(hour<10) hour = "0"+hour;
-  var min = d.getMinutes();
-  if(min<10) min = "0"+min;
+  var day = ["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()];
+  var hour = d.getHours();   if(hour<10) hour = "0"+hour;
+  var min = d.getMinutes();  if(min<10)  min  = "0"+min;
   return day+" "+hour+":"+min;
 }
-
-// Prettier version from Alice Monday
-//var pretty_date = function(){
-//  var d = new Date(), h = d.getHours(), m = d.getMinutes(), 
-//  a = ["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()],
-//  return a+" "+(h<10?"0":"")+h+":"+(m<10?"0":"")+m }
 
 // Show the last shiftstart time
 function shsh0() {
@@ -35,7 +29,7 @@ function shsh0() {
   return s;  
 }
 
-// Show the last shiftend time
+// Show the last shiftend time (used in allset.html)
 function shsh1() {
   var s = ScriptProperties.getProperty("shiftend");
   if(s==null) s = "never";
@@ -73,29 +67,21 @@ function doGet() {
     trig("shiftaroo", 00, 00);
     trig("cleanup",   01, 00);
     trig("noonshift", 12, 00);
+    trig("snzlDel",   13, 00);
+    trig("snzlAdd",   14, 00);
+    trig("snzlDel",   15, 00);
+    trig("snzlAdd",   16, 00);
+    trig("snzlDel",   17, 00);
+    trig("snzlAdd",   18, 00);
+    trig("snzlDel",   19, 00);
+    trig("snzlAdd",   20, 00);
+    trig("snzlDel",   21, 00);
+    trig("snzlAdd",   22, 00);
+    trig("snzlDel",   23, 00);
+    trig("snzlAdd",   23, 30);
   }
   
-  //return HtmlService.createHtmlOutputFromFile('allset');
   return HtmlService.createTemplateFromFile('allset').evaluate();
-}
-
-// Number of significant digits of an integer
-//function sigfigsInt(x) { return ((''+x).replace(/0*$/, '')).length; }
-
-// Returns the max integer label, or label of the form prefixNN with max NN
-function smax(prefix) {
-  prefix = (typeof prefix === "undefined") ? "" : prefix;
-  var all = GmailApp.getUserLabels();
-  var smax = 0, s, x;
-  var re = new RegExp('^'+prefix+'\\d+$')
-  for(var i = 0; i < all.length; i++) {
-    s = all[i].getName();
-    if(s.match(re)) {
-      x = parseInt(s.substr(prefix.length));
-      if(x > smax) smax = x;
-    }
-  }
-  return smax;  
 }
 
 // Label to Integer: take a string with prefix, strip the prefix, parse as int
@@ -121,12 +107,12 @@ function intlabels(prefix) {
 function labelmove(la, lb) {
   var page;
   do {
-    page = la.getThreads(0,100);
+    page = la.getThreads(0,BATCH);
     if(page.length > 0) {
       lb.addToThreads(page);      // important to add label lb first in case the 
       la.removeFromThreads(page); //   script is killed after removing label la
     }
-  } while(page.length==100); // get threads in pages of 100 at a time
+  } while(page.length==BATCH); // get threads in pages of BATCH at a time
 }
 
 // For all threads with label l, remove label l and add to the inbox
@@ -134,19 +120,19 @@ function labelmove(la, lb) {
 function labeltoinbox(l) {
   var page;
   do {
-    page = l.getThreads(0,100);
+    page = l.getThreads(0,BATCH);
     if(page.length > 0) {
       GmailApp.moveThreadsToInbox(page); // order of these two lines
       l.removeFromThreads(page);         //   is important (see labelmove func)
     }
-  } while(page.length==100);
+  } while(page.length==BATCH);
 }
 
 // For all threads with label l, remove them from the inbox (and keep label l)
 function labelfrominbox(l) {
   var page = null;
-  for(var i = 0; page == null || page.length == 100; i += 100) {
-    page = l.getThreads(i,100);
+  for(var i = 0; page == null || page.length == BATCH; i += BATCH) {
+    page = l.getThreads(i,BATCH);
     if(page.length > 0) GmailApp.moveThreadsToArchive(page);
   }
 }
@@ -157,31 +143,68 @@ function cleanup() {
   var page; // an array of threads
   for(var i = 0; i < all.length; ++i) {
     page = all[i].getThreads(0,1);
-    if(page.length==0 && all[i].getName().length > 1)
-      all[i].deleteLabel();
+    if(page.length==0 && all[i].getName().length > 1) all[i].deleteLabel();
   }
 }
 
-// Shifts labels of the form prefixNN, assuming that prefix1 is already emptied.
-// So first do the base shift from prefix1 to bare prefix or inbox, then call 
-// this.
-function genshift(ll, prefix) {
-  prefix = (typeof prefix === "undefined") ? "" : prefix;
+// Shifts integer labels N to N-1, assuming that "1" is already emptied.
+// So first do the base shift from "1" to inbox, then call this.
+function genshift(ll) { // takes list of labels, ll
   var hil = {}; // hash from integer to label object
   var l;        // the actual integer for the current label
   for(var i = 0; i < ll.length; i++) {
-    l = l2i(ll[i].getName(), prefix);
+    l = parseInt(ll[i].getName());
     hil[l] = ll[i];
     if(l <= 1) continue;
-    if(!hil[l-1]) hil[l-1] = GmailApp.createLabel(prefix+(l-1));
+    if(!hil[l-1]) hil[l-1] = GmailApp.createLabel(""+(l-1));
     labelmove(hil[l], hil[l-1]);
     //Utilities.sleep(1000); // times out with this; complains without it
-    //ScriptProperties.setProperty(prefix+"maxl", l);
+    //ScriptProperties.setProperty("maxl", l);
   }
+}
+
+// Whether thread t has an integer label
+function hasIntLabel(t) {
+  var labels = t.getLabels();  
+  var re = new RegExp('^\\d+$');
+  for(var j = 0; j < labels.length; j++) {
+    if(labels[j].getName().match(re)) return true;
+  }
+  return false;
+}
+
+// Remove snooze label from threads neither in inbox nor with integer label
+function snzlDel() {
+  if(!SNZL && SNZL.length == 0) return;
+  var snz = GmailApp.getUserLabelByName(SNZL);
+  if(!snz) return;
+  var page;
+  do {
+    page = snz.getThreads(0,BATCH);
+    for(var i = 0; i < page.length; i++)
+      if(!hasIntLabel(page[i]) && !page[i].isInInbox()) 
+        snz.removeFromThread(page[i]);
+  } while(page.length==BATCH); // get SNZL threads in pages of BATCH at a time
+}
+
+// Add snooze label to integer-labeled threads (optionally pass in list of intlabels)
+function snzlAdd(labels) {
+  labels = (typeof labels === "undefined") ? intlabels() : labels;
+  if(!SNZL && SNZL.length == 0) return;
+  var snz = GmailApp.getUserLabelByName(SNZL);
+  if(!snz) snz = GmailApp.createLabel(SNZL);
+  var page;
+  for(var i = 0; i < labels.length; i++) {
+    do {
+      page = labels[i].getThreads(0,BATCH);
+      for(var j = 0; j < page.length; j++) snz.addToThread(page[j]);
+    } while(page.length==BATCH);
+  }    
 }
 
 // Shift snooze labels; ..., 3->2, 2->1, 1->inbox (triggered nightly)
 function shiftaroo() {
+  // Google says ScriptProperties is deprecated...
   //ScriptProperties.setProperty("checkt", Date.now());
   //ScriptProperties.setProperty("maxl", 0);
   ScriptProperties.setProperty("shiftstart", shdt());
@@ -213,23 +236,6 @@ function shiftback() {
   }  
 }
 
-// Similar to shiftaroo but for auto-expire (triggered nightly)
-// ..., x3->x2, x2->x1, x1->x (and out of inbox when it hits just "x")
-function exparoo() {
-  var prefix = "x";
-  var all = intlabels(prefix);
-  if(all.length===0) return;  
-  if(l2i(all[0].getName(), prefix) == 0) all.shift();
-  if(all.length===0) return;
-  if(l2i(all[0].getName(), prefix) == 1) {
-    x = GmailApp.getUserLabelByName(prefix);
-    if(!x) x = GmailApp.createLabel(prefix);
-    labelfrominbox(all[0]);  // first get all these x1 threads out of the inbox
-    labelmove(all[0], x);    // then remove the label x1 and add the label x
-  }
-  genshift(all, prefix);
-}
-
 // Shift snooze label 0 to inbox, triggered daily at noon
 function noonshift() {
   var z = GmailApp.getUserLabelByName("0");
@@ -237,28 +243,23 @@ function noonshift() {
   labeltoinbox(z);
 }
 
-// Return a summary string of the number of messages with each snooze/exp label
-function tally(prefix) {
-  prefix = (typeof prefix === "undefined") ? "" : prefix;
-  var all = intlabels(prefix);
+// Return a summary string of the number of messages with each snooze label
+function tally() {
+  var all = intlabels();
+  snzlDel();
+  //snzlAdd(all);
   var d = new Date();
   var h = d.getHours();
   if(h>=12 && all.length>=2 && l2i(all[0].getName())==0 
                             && l2i(all[1].getName())==1) {
     var x = all.shift();
     var y = all.shift();
-    all.unshift(y, x);
+    all.unshift(y, x);      // if after noon, show label 0 after label 1
   }
   // the string s will be an ascii table of thread counts and cumulative counts
-  var s = (prefix=='' ? "SNZ" : "EXP")+"\tTHR\tTOT\n";
-  s += "" + (prefix=='' ? '' : prefix) + "\t"; 
+  var s = "SNZ\tTHR\tTOT\n\t";
   var page;
-  if(prefix=='') page = GmailApp.getInboxThreads(0,100);
-  else {
-    var lp = GmailApp.getUserLabelByName(prefix);
-    if(!lp) page = [];
-    else page = lp.getThreads(0,100);
-  }
+  page = GmailApp.getInboxThreads(0,100);
   var n = page.length;
   var cum = n;
   var initcount = '' + n + (n==100 ? "+" : "");
@@ -278,6 +279,55 @@ function tally(prefix) {
 }
 
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// UNUSED STUFF BELOW //////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+// For all threads with label la, add label lb as well
+function labelcopy(la, lb) {
+  var page;
+  do {
+    page = la.getThreads(0,BATCH);
+    if(page.length > 0) lb.addToThreads(page);
+  } while(page.length==BATCH); // get threads in pages of BATCH at a time
+}
+
+// Returns the max integer label, or label of the form prefixNN with max NN
+function smax(prefix) {
+  prefix = (typeof prefix === "undefined") ? "" : prefix;
+  var all = GmailApp.getUserLabels();
+  var smax = 0, s, x;
+  var re = new RegExp('^'+prefix+'\\d+$')
+  for(var i = 0; i < all.length; i++) {
+    s = all[i].getName();
+    if(s.match(re)) {
+      x = parseInt(s.substr(prefix.length));
+      if(x > smax) smax = x;
+    }
+  }
+  return smax;  
+}
+
+// Number of significant digits of an integer
+//function sigfigsInt(x) { return ((''+x).replace(/0*$/, '')).length; }
+
+// Similar to shiftaroo but for auto-expire (triggered nightly)
+// ..., x3->x2, x2->x1, x1->x (and out of inbox when it hits just "x")
+//function exparoo() {
+//  var prefix = "x";
+//  var all = intlabels(prefix);
+//  if(all.length===0) return;  
+//  if(l2i(all[0].getName(), prefix) == 0) all.shift();
+//  if(all.length===0) return;
+//  if(l2i(all[0].getName(), prefix) == 1) {
+//    x = GmailApp.getUserLabelByName(prefix);
+//    if(!x) x = GmailApp.createLabel(prefix);
+//    labelfrominbox(all[0]);  // first get all these x1 threads out of the inbox
+//    labelmove(all[0], x);    // then remove the label x1 and add the label x
+//  }
+//  genshift(all, prefix);
+//}
+
 // Remove empty labels of the form prefixNN, except 0-9:
 //function cleanupOld(prefix) {
 //  prefix = (typeof prefix === "undefined") ? "" : prefix;
@@ -289,7 +339,3 @@ function tally(prefix) {
 //      all[i].deleteLabel();
 //  }
 //}
-
-//function cleanupx() { cleanupOld('x'); }
-//function cleanup1() { cleanup(); } // keep this for people with old versions?
-//function cleanup2() { cleanupOld('x'); } // same here
