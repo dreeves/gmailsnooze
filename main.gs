@@ -52,7 +52,8 @@ function arraysEqual(a, b) {
 function doGet() {
   var t = ScriptApp.getProjectTriggers(); // was getScriptTriggers
   if(arraysEqual(t.map(function(x){ return x.getHandlerFunction(); }), 
-                 ["shiftaroo", "cleanup", "noonshift"])) {
+                 ["shiftaroo", "cleanup", "noonshift", 
+                  "snzlDel", "snzlAdd"])) {
     Logger.log("Triggers already set up");
   } else { // delete all triggers from last time we ran this script
     var n = t.length;
@@ -202,6 +203,7 @@ function snzlAdd(labels) {
   }    
 }
 
+// ------------------------------------------------------------ (80 chars) ---->
 // Shift snooze labels; ..., 3->2, 2->1, 1->inbox (triggered nightly)
 function shiftaroo() {
   // Google says ScriptProperties is deprecated...
@@ -210,7 +212,7 @@ function shiftaroo() {
   ScriptProperties.setProperty("shiftstart", shdt());
   var all = intlabels();
   if(all.length===0) return;
-  if(l2i(all[0].getName()) == 0) all.shift();
+  if(l2i(all[0].getName()) == 0) all.shift(); // ignore the zero label
   if(all.length===0) return;
   if(l2i(all[0].getName()) == 1) labeltoinbox(all[0]);
   //ScriptProperties.setProperty("maxl", 1);
@@ -219,7 +221,11 @@ function shiftaroo() {
 }
 
 // Shift snooze labels back the other way (except inbox), for testing
-function shiftback() {
+// WARNING: currently broken! it sends 1 to 2 and then 2 to 3, etc so
+// they all bunch up at the last label before a gap.
+// Will probably work as intended by walking through intlabels() in 
+// reverse order.
+function shiftbackBROKEN() {
   var all = intlabels();
   if(all.length===0) return;
   if(l2i(all[0].getName()) == 0) all.shift();
@@ -236,6 +242,13 @@ function shiftback() {
   }  
 }
 
+// Shift snooze labels back the other way (except inbox), for testing
+function shiftback() {
+  //var all = intlabels();
+  //if(all.length===0) return;
+  //if(l2i(all
+}
+
 // Shift snooze label 0 to inbox, triggered daily at noon
 function noonshift() {
   var z = GmailApp.getUserLabelByName("0");
@@ -246,7 +259,7 @@ function noonshift() {
 // Return a summary string of the number of messages with each snooze label
 function tally() {
   var all = intlabels();
-  snzlDel();
+  //snzlDel();     // Would make sense to do this but too slow...
   //snzlAdd(all);
   var d = new Date();
   var h = d.getHours();
